@@ -10,15 +10,19 @@ with open('../raw_data/remap.pkl', 'rb') as f:
 
 train_set = []
 test_set = []
+#for the same reviewer, groupy his behaviers
 for reviewerID, hist in reviews_df.groupby('reviewerID'):
   pos_list = hist['asin'].tolist()
+  #ramdom negative sampling 
   def gen_neg():
+    #pos_list stores index
     neg = pos_list[0]
     while neg in pos_list:
       neg = random.randint(0, item_count-1)
     return neg
   neg_list = [gen_neg() for i in range(len(pos_list))]
 
+  #here, features only contain reviewerID, history asin id, current asin id
   for i in range(1, len(pos_list)):
     hist = pos_list[:i]
     if i != len(pos_list) - 1:
