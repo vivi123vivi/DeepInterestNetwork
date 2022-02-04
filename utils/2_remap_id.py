@@ -10,12 +10,15 @@ with open('../raw_data/reviews.pkl', 'rb') as f:
 with open('../raw_data/meta.pkl', 'rb') as f:
   meta_df = pickle.load(f)
   meta_df = meta_df[['asin', 'categories']]
+  print ("111 %s" % meta_df['categories'])
   meta_df['categories'] = meta_df['categories'].map(lambda x: x[-1][-1])
+  print ("222 %s" % meta_df['categories'])
 
 
 def build_map(df, col_name):
   key = sorted(df[col_name].unique().tolist())
   m = dict(zip(key, range(len(key))))
+  #df['col_name'] value trans to index, including meta_df['asin'], meta_df['categories'], reviews_df['reviewerID']
   df[col_name] = df[col_name].map(lambda x: m[x])
   return m, key
 
@@ -28,9 +31,12 @@ user_count, item_count, cate_count, example_count =\
 print('user_count: %d\titem_count: %d\tcate_count: %d\texample_count: %d' %
       (user_count, item_count, cate_count, example_count))
 
+#sort by index
 meta_df = meta_df.sort_values('asin')
 meta_df = meta_df.reset_index(drop=True)
+#reviews_df['asin'] value trans to index
 reviews_df['asin'] = reviews_df['asin'].map(lambda x: asin_map[x])
+#sort by reviewerID and unixReviewTime
 reviews_df = reviews_df.sort_values(['reviewerID', 'unixReviewTime'])
 reviews_df = reviews_df.reset_index(drop=True)
 reviews_df = reviews_df[['reviewerID', 'asin', 'unixReviewTime']]
