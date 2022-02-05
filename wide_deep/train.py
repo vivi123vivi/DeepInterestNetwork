@@ -61,6 +61,7 @@ def _auc_arr(score):
   #print "============== n ============="
   #print score_n
   score_arr = []
+  #score_p的大小是batch_size
   for s in score_p.tolist():
     score_arr.append([0, 1, s])
   for s in score_n.tolist():
@@ -70,9 +71,13 @@ def _eval(sess, model):
   auc_sum = 0.0
   score_arr = []
   for _, uij in DataInputTest(test_set, test_batch_size):
+    #auc_:正负样本pair对中，正样本打分大于负样本打分的数量
+    #score_:具体的正负样本打分pair对
     auc_, score_ = model.eval(sess, uij)
     score_arr += _auc_arr(score_)
+    #一个test_batch_size的用户数作为weight
     auc_sum += auc_ * len(uij[0])
+  #总用户数作为分母，其实这里算的是一个batch粒度的auc，也不是单个用户粒度的auc
   test_gauc = auc_sum / len(test_set)
   Auc = calc_auc(score_arr)
   global best_auc

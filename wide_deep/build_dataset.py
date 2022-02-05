@@ -22,7 +22,7 @@ for reviewerID, hist in reviews_df.groupby('reviewerID'):
     return neg
   neg_list = [gen_neg() for i in range(len(pos_list))]
 
-  #here, features only contain reviewerID, history asin id, current asin id
+  #here, features only contain reviewerID, history asin ids, current asin id
   for i in range(1, len(pos_list)):
     hist = pos_list[:i]
     if i != len(pos_list) - 1:
@@ -35,6 +35,7 @@ for reviewerID, hist in reviews_df.groupby('reviewerID'):
 random.shuffle(train_set)
 random.shuffle(test_set)
 
+#每个用户至少有一个测试集，保证了用户覆盖，测试auc会算的更精准
 assert len(test_set) == user_count
 # assert(len(test_set) + len(train_set) // 2 == reviews_df.shape[0])
 

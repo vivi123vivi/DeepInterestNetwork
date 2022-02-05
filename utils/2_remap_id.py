@@ -11,6 +11,7 @@ with open('../raw_data/meta.pkl', 'rb') as f:
   meta_df = pickle.load(f)
   meta_df = meta_df[['asin', 'categories']]
   print ("111 %s" % meta_df['categories'])
+  #一个asin只取一个category，这里应该是出于简化处理考虑
   meta_df['categories'] = meta_df['categories'].map(lambda x: x[-1][-1])
   print ("222 %s" % meta_df['categories'])
 

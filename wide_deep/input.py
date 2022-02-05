@@ -23,11 +23,17 @@ class DataInput:
     self.i += 1
 
     u, i, y, sl = [], [], [], []
+    #ts是总样本条数
     for t in ts:
+      #reviewID
       u.append(t[0])
+      #positive asin or negtive asin
       i.append(t[2])
+      #label 1 or 0
       y.append(t[3])
+      #hist长度数组
       sl.append(len(t[1]))
+    #最大的hist length  
     max_sl = max(sl)
 
     hist_i = np.zeros([len(ts), max_sl], np.int64)
@@ -64,9 +70,13 @@ class DataInputTest:
 
     u, i, j, sl = [], [], [], []
     for t in ts:
+      #reviewID
       u.append(t[0])
+      #positive item
       i.append(t[2][0])
+      #negative item
       j.append(t[2][1])
+      #hist length数组
       sl.append(len(t[1]))
     max_sl = max(sl)
 
