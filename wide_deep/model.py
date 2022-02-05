@@ -4,6 +4,7 @@ class Model(object):
 
   def __init__(self, user_count, item_count, cate_count, cate_list):
 
+    #placeholder always cooprate with Session feed_list
     self.u = tf.placeholder(tf.int32, [None,]) # [B]
     self.i = tf.placeholder(tf.int32, [None,]) # [B]
     self.j = tf.placeholder(tf.int32, [None,]) # [B]
