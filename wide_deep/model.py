@@ -140,7 +140,7 @@ class Model(object):
     #u_emb扩充前[batch_size, 128]，扩充后[batch_size, item_count, 128]
     u_emb_all = tf.expand_dims(u_emb, 1)
     u_emb_all = tf.tile(u_emb_all, [1, item_count, 1])
-    # logits for all item:
+    # logits for all item: 这里算的是这个数据集的总logits，而不是这个batch_size的
     # all_emb:[item_count, 64+64=128]
     all_emb = tf.concat([
         item_emb_w,

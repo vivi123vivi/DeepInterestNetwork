@@ -65,9 +65,16 @@ class Model(object):
     d_layer_1_i = tf.layers.dense(din_i, 80, activation=tf.nn.sigmoid, name='f1')
     d_layer_2_i = tf.layers.dense(d_layer_1_i, 40, activation=tf.nn.sigmoid, name='f2')
     d_layer_3_i = tf.layers.dense(d_layer_2_i, 1, activation=None, name='f3')
+
     # fm part
+    #u_emb:[batch_size, 128]，i_emb:[batch_size, 128]
+    #u_emb和i_emb的哈达玛积，表示fm的二阶部分。和wide&deep实现类似，这里一阶部分是用得u_emb和i_emb得最开始和最后两维数据，来做加法
+    #最终fm部分的效果：[u_emb1*i_emb1, u_emb2*i_emb2, ..., u_emb128*i_emb128, u_emb1+i_emb1]，共129个元素，每个元素学习一个w，
+    #前128个元素代表fm的二阶，第129个元素代表fm的一阶
+    #实现的比较简陋...
     d_layer_fm_i = tf.concat([tf.reduce_sum(u_emb*i_emb, axis=-1, keep_dims=True), tf.gather(u_emb, [0], axis=-1) + tf.gather(i_emb, [0], axis=-1)], axis=-1)
     d_layer_fm_i = tf.layers.dense(d_layer_fm_i, 1, activation=None, name='f_fm')
+
     din_j = tf.concat([u_emb, j_emb], axis=-1)
     din_j = tf.layers.batch_normalization(inputs=din_j, name='b1', reuse=True)
     d_layer_1_j = tf.layers.dense(din_j, 80, activation=tf.nn.sigmoid, name='f1', reuse=True)
@@ -81,6 +88,7 @@ class Model(object):
     d_layer_fm_j = tf.reshape(d_layer_fm_j, [-1])
     x = i_b - j_b + d_layer_3_i - d_layer_3_j + d_layer_fm_i - d_layer_fm_j # [B]
     self.logits = i_b + d_layer_3_i + d_layer_fm_i
+
     u_emb_all = tf.expand_dims(u_emb, 1)
     u_emb_all = tf.tile(u_emb_all, [1, item_count, 1])
     # logits for all item:

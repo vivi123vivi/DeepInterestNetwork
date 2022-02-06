@@ -43,11 +43,13 @@ class Model(object):
         tf.nn.embedding_lookup(cate_emb_w, hc),
         ], axis=2)
 
+    #i_emb:[batch_size, 128], h_emb:[batch_size, hist_len, 128], hist_i:[batch_size, 1, embedding_len=128]
     hist_i =attention(i_emb, h_emb, self.sl)
     #-- attention end ---
     
     hist_i = tf.layers.batch_normalization(inputs = hist_i)
     hist_i = tf.reshape(hist_i, [-1, hidden_units], name='hist_bn')
+    #input:[batch_size, embedding_len=128], kernal:[128, 128], hist_i:[batch_size, embedding_len=128]
     hist_i = tf.layers.dense(hist_i, hidden_units, name='hist_fcn')
 
     u_emb_i = hist_i
@@ -65,7 +67,9 @@ class Model(object):
     print u_emb_j.get_shape().as_list()
     print i_emb.get_shape().as_list()
     print j_emb.get_shape().as_list()
+    
     #-- fcn begin -------
+    #din_i:[batch_size, 128*3]
     din_i = tf.concat([u_emb_i, i_emb, u_emb_i * i_emb], axis=-1)
     din_i = tf.layers.batch_normalization(inputs=din_i, name='b1')
     d_layer_1_i = tf.layers.dense(din_i, 80, activation=tf.nn.sigmoid, name='f1')
@@ -75,6 +79,8 @@ class Model(object):
     d_layer_2_i = tf.layers.dense(d_layer_1_i, 40, activation=tf.nn.sigmoid, name='f2')
     # d_layer_2_i = tf.layers.dense(d_layer_1_i, 40, activation=None, name='f2')
     # d_layer_2_i = dice(d_layer_2_i, name='dice_2_i')
+
+    #d_layer_3_i:[batch_size, 1]
     d_layer_3_i = tf.layers.dense(d_layer_2_i, 1, activation=None, name='f3')
     din_j = tf.concat([u_emb_j, j_emb, u_emb_j * j_emb], axis=-1)
     din_j = tf.layers.batch_normalization(inputs=din_j, name='b1', reuse=True)
@@ -92,23 +98,30 @@ class Model(object):
     
     # prediciton for selected items
     # logits for selected item:
+    #以下部分代码增加的注释可能有误，后续再补充。和之前代码的区别大致是以下代码，计算样本集合里所有item里截图前predict_ads_num个item，计算总的
+    #logits，代码逻辑整体上是一致的
     item_emb_all = tf.concat([
         item_emb_w,
         tf.nn.embedding_lookup(cate_emb_w, cate_list)
         ], axis=1)
+    #截取前predict_ads_num个item
     item_emb_sub = item_emb_all[:predict_ads_num,:]
     item_emb_sub = tf.expand_dims(item_emb_sub, 0)
+    #[predict_batch_size, predict_ads_num, 64+64=128]
     item_emb_sub = tf.tile(item_emb_sub, [predict_batch_size, 1, 1])
     hist_sub =attention_multi_items(item_emb_sub, h_emb, self.sl)
     #-- attention end ---
     
     hist_sub = tf.layers.batch_normalization(inputs = hist_sub, name='hist_bn', reuse=tf.AUTO_REUSE)
     # print hist_sub.get_shape().as_list() 
+    # [predict_ads_num*predict_ads_num, 128]?
     hist_sub = tf.reshape(hist_sub, [-1, hidden_units])
     hist_sub = tf.layers.dense(hist_sub, hidden_units, name='hist_fcn', reuse=tf.AUTO_REUSE)
 
     u_emb_sub = hist_sub
+    #[predict_batch_size, predict_ads_num, 128]->[predict_batch_size*predict_ads_num, 128]
     item_emb_sub = tf.reshape(item_emb_sub, [-1, hidden_units])
+    #[predict_batch_size*predict_ads_num, 128*3]
     din_sub = tf.concat([u_emb_sub, item_emb_sub, u_emb_sub * item_emb_sub], axis=-1)
     din_sub = tf.layers.batch_normalization(inputs=din_sub, name='b1', reuse=True)
     d_layer_1_sub = tf.layers.dense(din_sub, 80, activation=tf.nn.sigmoid, name='f1', reuse=True)
@@ -116,8 +129,11 @@ class Model(object):
     d_layer_2_sub = tf.layers.dense(d_layer_1_sub, 40, activation=tf.nn.sigmoid, name='f2', reuse=True)
     #d_layer_2_sub = dice(d_layer_2_sub, name='dice_2_sub')
     d_layer_3_sub = tf.layers.dense(d_layer_2_sub, 1, activation=None, name='f3', reuse=True)
+    #[]
     d_layer_3_sub = tf.reshape(d_layer_3_sub, [-1, predict_ads_num])
+    #item_b:[item_count]->[predict_ads_num], d_layer_3_sub:[1, predict_ads_num]
     self.logits_sub = tf.sigmoid(item_b[:predict_ads_num] + d_layer_3_sub)
+    #
     self.logits_sub = tf.reshape(self.logits_sub, [-1, predict_ads_num, 1])
     #-- fcn end -------
 
@@ -203,28 +219,42 @@ def attention(queries, keys, keys_length):
     keys:        [B, T, H]
     keys_length: [B]
   '''
-  queries_hidden_units = queries.get_shape().as_list()[-1]
-  queries = tf.tile(queries, [1, tf.shape(keys)[1]])
+  queries_hidden_units = queries.get_shape().as_list()[-1]  #128
+  #querys扩展第一维（hits_len），对齐keys的维度
+  queries = tf.tile(queries, [1, tf.shape(keys)[1]])  
   queries = tf.reshape(queries, [-1, tf.shape(keys)[1], queries_hidden_units])
+  #din_all:[batch_size, hist_len, 128*4]，这里用了queries, keys, queries-keys, queries*keys来刻画querys和keys之间的关系，然后喂入神经网络
   din_all = tf.concat([queries, keys, queries-keys, queries*keys], axis=-1)
+  #input:[batch_size, hist_len, 128*4]
+  #kernal:[128*4, 80]
+  #d_layer_1_all:[batch_size, hist_len, 80]
   d_layer_1_all = tf.layers.dense(din_all, 80, activation=tf.nn.sigmoid, name='f1_att', reuse=tf.AUTO_REUSE)
+  #d_layer_2_all:[batch_size, hist_len, 40]
   d_layer_2_all = tf.layers.dense(d_layer_1_all, 40, activation=tf.nn.sigmoid, name='f2_att', reuse=tf.AUTO_REUSE)
+  #d_layer_2_all:[batch_size, hist_len, 1]
   d_layer_3_all = tf.layers.dense(d_layer_2_all, 1, activation=None, name='f3_att', reuse=tf.AUTO_REUSE)
+  #d_layer_3_all:[batch_size, 1, hist_len]
   d_layer_3_all = tf.reshape(d_layer_3_all, [-1, 1, tf.shape(keys)[1]])
-  outputs = d_layer_3_all 
+  outputs = d_layer_3_all
   # Mask
+  #key_masks:[batch_size, hist_len]，hist_len的元素置为1，其他置为0
   key_masks = tf.sequence_mask(keys_length, tf.shape(keys)[1])   # [B, T]
+  #key_masks:[batch_size, 1, hist_len]
   key_masks = tf.expand_dims(key_masks, 1) # [B, 1, T]
+  #paddings:[batch_size, 1, hist_len]
   paddings = tf.ones_like(outputs) * (-2 ** 32 + 1)
+  #key_masks中为1的，获取outputs对应的值，为0的获取paddings中的值
   outputs = tf.where(key_masks, outputs, paddings)  # [B, 1, T]
 
   # Scale
+  #除以hist_len**0.5
   outputs = outputs / (keys.get_shape().as_list()[-1] ** 0.5)
 
   # Activation
   outputs = tf.nn.softmax(outputs)  # [B, 1, T]
 
   # Weighted sum
+  # outputs:[batch_size, 1, hist_len], keys:[batch_size, hist_len, embedding_len=128], outputs:[batch_size, 1, embedding_len=128]
   outputs = tf.matmul(outputs, keys)  # [B, 1, H]
 
   return outputs
